@@ -174,3 +174,87 @@ $ mysql -u root < all_database.mysql
 ```
 * change master to ... (details from show master status above)
 * mysql> start slave
+
+### More tips about replication issue
+When found that the replication not work, check the slave status:
+```
+mysql> show slave status\G
+*************************** 1. row ***************************
+               Slave_IO_State:
+                  Master_Host: xxxx
+
+                  Master_User: xxx
+                  Master_Port: 3306
+                Connect_Retry: 60
+              Master_Log_File: xxx-bin.000001
+          Read_Master_Log_Pos: 1440046
+               Relay_Log_File: host-relay-bin.000001
+                Relay_Log_Pos: 4
+        Relay_Master_Log_File:xxx-bin.000001
+             Slave_IO_Running: No
+            Slave_SQL_Running: Yes
+              Replicate_Do_DB: xxx
+          Replicate_Ignore_DB: mysql
+           Replicate_Do_Table:
+       Replicate_Ignore_Table:
+      Replicate_Wild_Do_Table:
+  Replicate_Wild_Ignore_Table:
+                   Last_Errno: 0
+                   Last_Error:
+                 Skip_Counter: 0
+          Exec_Master_Log_Pos: 1440046
+              Relay_Log_Space: 106
+              Until_Condition: None
+               Until_Log_File:
+                Until_Log_Pos: 0
+           Master_SSL_Allowed: No
+           Master_SSL_CA_File:
+           Master_SSL_CA_Path:
+              Master_SSL_Cert:
+            Master_SSL_Cipher:
+               Master_SSL_Key:
+        Seconds_Behind_Master: NULL
+Master_SSL_Verify_Server_Cert: No
+                Last_IO_Errno: 1236
+                Last_IO_Error: Got fatal error 1236 from master when reading data from binary log: 'Could not find first log file name in binary log index file'
+               Last_SQL_Errno: 0
+               Last_SQL_Error:
+1 row in set (0.00 sec)
+```
+ 
+
+And read from slave mysql, the log file print error logs：
+```
+101027 16:50:58 [Note] Slave I/O thread: connected to master 'xxx@xxxxxx:3306',replication started in log 'xxx-bin.000001' at position 1440046
+101027 16:50:58 [ERROR] Error reading packet from server: Could not find first log file name in binary log index file ( server_errno=1236)
+101027 16:50:58 [ERROR] Slave I/O: Got fatal error 1236 from master when reading data from binary log: 'Could not find first log file name in binary log index file', Error_code: 1236
+101027 16:50:58 [Note] Slave I/O thread exiting, read up to log 'xxx-bin.000001', position 1440046
+```
+And check the master status:
+```
+mysql> show master status\G
+*************************** 1. row ***************************
+            File: mysql-bin.000001
+        Position: 1440046
+    Binlog_Do_DB:
+Binlog_Ignore_DB:
+1 row in set (0.00 sec)
+```
+As a common fix steps, it would be:
+```
+mysql> slave stop;
+mysql> CHANGE MASTER TO MASTER_HOST='xxx',MASTER_USER='xx',MASTER_PASSWORD='xx',MASTER_PORT=3306,MASTER_LOG_FILE='xxx-bin.000001',MASTER_LOG_POS=1440046;
+mysql> slave start;
+```
+But if you found issue still there, you can do this to fix:
+
+1. restart slave mysql service
+
+2. regrant privileges on master to replication user on slave.
+
+3. Run these commands:
+```
+slave stop;
+reset slave;
+slave start;
+```
